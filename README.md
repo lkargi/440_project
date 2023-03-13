@@ -14,6 +14,6 @@
 		
 - **data/**	directory containing data used in analysis
 - **fig/**	directory containing outputs from src/vis
-	**notebook/**	directory containing notebooks used in initial data exploration 
+- **notebook/**	directory containing notebooks used in initial data exploration 
 
 # INSTALLATION
