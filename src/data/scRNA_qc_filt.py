@@ -41,7 +41,7 @@ def log_normalize(filt, scale = 10000):
     return np.log10( np.divide(filt.T, tot_mol).T * scale + 1)
 
 if __name__ == "__main__":
-    data_dir = "s9_rosa26WT-P8"
+    data_dir = "s9_rosa26WT_p8"
     filt = QC(data_dir)
     norm = log_normalize(filt)
     if not os.path.isdir('data/filt_norm/'+data_dir):
