@@ -51,9 +51,12 @@ Raw data is available at: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE
     - run "pip install -r requirements.txt" to install all requirements
 
 2. download data from https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE182202 and place into **data/raw/** directory (create if needed)
+    - NOTE: for UMAP plot (figure 1) this can be done with command:  "sh figures.sh UMAP"
+    - NOTE: for UMAP plot (figure 1) only GSM5520356  mtx file is needed 
     - unzip *.tar.gz to get experiment directory
     - in experiment directory unzip *.tsv.gz and *.mtx.gz to get individual data files
-    - NOTE: for UMAP plot (figure 1) only GSM5520356  mtx file is needed
+    
+
 
 
 3. Use figures.sh to generate all figures.
