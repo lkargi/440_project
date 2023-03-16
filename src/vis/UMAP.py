@@ -40,7 +40,7 @@ def plot_UMAP(vargenes, PCA_dim = 10, data = "Wild Type"):
     
     ax.set_ylabel('UMAP2')
     ax.set_xlabel('UMAP1')
-    ax.set_title(f'UMAP of {data} scRNA seq data')
+    ax.set_title(f'UMAP of {data} Cochlear Cell mRNA Expression')
     fig.savefig('fig/UMAP.png')
 
 
