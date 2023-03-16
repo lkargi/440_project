@@ -2,7 +2,7 @@
 	Git Repository for 20.440 final project.
 	
 # DATA
-    scRNA seq of ATOH1, GFI1, and POUF4 reprogrammed cochlear hair cells data from 3 genetically engineered mouse models showing transcriptional profiles of 
+    scRNA seq of ATOH1, GFI1, and POUF4 reprogrammed cochlear hair cells from 3 genetically engineered mouse models
 
 	data is available at https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE182202
 
