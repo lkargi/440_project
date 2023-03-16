@@ -47,6 +47,8 @@ Raw data is available at: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE
 
 # INSTALLATION
 
+Analysis done on OSX 13.2.1
+
 1. See requirements.txt for library requirements. 
     - run "pip install -r requirements.txt" to install all requirements
 
