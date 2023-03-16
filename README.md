@@ -1,5 +1,6 @@
 # OVERVIEW
-	Git Repository for 20.440 final project. Analysis of cochlear hair cell reprogramming in mice.
+
+Git Repository for 20.440 final project. Analysis of cochlear hair cell reprogramming in mice.
 	
 # DATA
 scRNA seq of ATOH1, GFI1, and POUF4 reprogrammed cochlear hair cells from 3 genetically engineered mouse models (Iyer et al.).  Mice were bred to create 3 conditional overexpression lines (ATOH1, ATOH1+GFI1, and ATOH1+GFI1+POUF4). Tamoxofin was injected at postnatal day 1 or day 8  (P1/P8) to stimulate reprogramming and cochlear cells were purified on P8 or P15 with FACS (1 week after tamoxofin injection).  These cells were used for scRNA seq. Lastly two additional datasets are available: simulatneous scRNA ATAC seq was done on P1 wild type mouse cochlear cells and P8 wild type mouse cochlear cells.
