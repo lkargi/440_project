@@ -1,10 +1,10 @@
 import numpy as np
 import sys
+from sklearn.decomposition import PCA
 
 sys.path.insert(0, 'src/data/')
 from scRNA_qc_filt import QC, log_normalize
 
-from sklearn.decomposition import PCA
 
 def most_variable_genes(norm, num_genes = 2000):
     """
