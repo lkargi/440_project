@@ -16,7 +16,7 @@ def QC(data_dir, gene_count_thresh = 1500 ):
          gene_count_thresh - number of genes required to keep cell
     """
     #Import Data
-    data = 'data/raw/'+data_dir+'matrix.mtx'
+    data = 'data/raw/'+data_dir+'/matrix.mtx'
     mtx = mmread(data)
     counts = np.array(mtx.todense()).T
 
