@@ -23,8 +23,6 @@ def plot_UMAP(vargenes, PCA_dim = 10, data = "Wild Type"):
                        genes (cells, genes)
             PCA_dim - number of PCA dimensions to use in UMAP
             data - data label to add to title of plot
-
-
         """
 
     #Run PCA to reduce dimensions of vargenes before UMAP
