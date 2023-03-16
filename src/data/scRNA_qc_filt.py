@@ -46,4 +46,4 @@ if __name__ == "__main__":
     norm = log_normalize(filt)
     if not os.path.isdir('data/filt_norm/'+data_dir):
         os.mkdir('data/filt_norm/'+data_dir)
-    np.save('data/filt_norm/'+data_dir+'/norm.npy')
+    np.save('data/filt_norm/'+data_dir+'/norm.npy', norm)
