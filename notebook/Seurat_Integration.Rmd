@@ -8,22 +8,138 @@ date: "2023-04-07"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+```{R}
+library(Seurat)
+library(Matrix)
+library(class)
+library(cccd)
+library(igraph)
+library(umap)
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+dirs = list.dirs("../data/raw", recursive = FALSE)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+for(dir in list.dirs("../data/raw", recursive = FALSE)){
+  print(dir)
+  
+  count_path = paste0(dir,'/matrix.mtx')
+  barcodes_path = paste0(dir,'/barcodes.tsv')
+  features_path = paste0(dir,'/features.tsv')
+  
+  count = Matrix::readMM(count_path)
+  barcodes = read.table(barcodes_path)
+  features = read.table(features_path)
+  
+  if(mean(grepl("_", features[,1])) == 1){
+    features[,1] = substring(features[,1], 8)
+  }
+  
+  if(mean(grepl("_", features[,2])) == 1){
+    features[,2] = substring(features[,2], 8)
+  }
+  
+  colnames(count) = barcodes[,1]
+  rownames(count) = toupper(features[,2])
+  
+  rownames(count)[which(duplicated(features[,2]))] = features[which(duplicated(features[,2])),1]
+  
+  mono = CreateSeuratObject(count)
 
-```{r cars}
-summary(cars)
+  cell_filt = (mono$nFeature_RNA >=200)
+  gene_filt  = rowSums(count != 0) >=5
+  mono = mono[gene_filt, cell_filt]  
+  
+  mt = PercentageFeatureSet(mono, pattern = "^MT-")
+  mono[["percent.mt"]] = mt
+  VlnPlot(mono, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+  
+  c = GetAssayData(object = mono, slot = "counts")
+
+  
+  cell_filt = (mono$nFeature_RNA <=5000) & (mono$nFeature_RNA >=750) & (mono$percent.mt <= 30)
+  mono = mono[, cell_filt]  
+  
+  mono = NormalizeData(mono, verbose = FALSE)
+  mono = FindVariableFeatures(mono, verbose = FALSE)
+  mono = ScaleData(mono, verbose = FALSE)
+  mono = RunPCA(mono, verbose = FALSE)
+  
+  mono <- FindNeighbors(mono, dims = 1:10, reduction = "pca", verbose = FALSE)
+  mono <- FindClusters(mono, resolution = .25, cluster.name = "unintegrated_clusters", verbose = FALSE)
+  
+  mono <- RunUMAP(mono, dims = 1:10, verbose = FALSE)
+  print(DimPlot(mono, reduction = "umap"))
+}
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+```{R}
+dir = dirs[1]
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+count_path = paste0(dir,'/matrix.mtx')
+barcodes_path = paste0(dir,'/barcodes.tsv')
+features_path = paste0(dir,'/features.tsv')
+
+count = Matrix::readMM(count_path)
+barcodes = read.table(barcodes_path)
+features = read.table(features_path)
+
+if(mean(grepl("_", features[,1])) == 1){
+  features[,1] = substring(features[,1], 8)
+}
+
+if(mean(grepl("_", features[,2])) == 1){
+  features[,2] = substring(features[,2], 8)
+}
+
+colnames(count) = barcodes[,1]
+rownames(count) = toupper(features[,2])
+
+rownames(count)[which(duplicated(features[,2]))] = features[which(duplicated(features[,2])),1]
+
+mono = CreateSeuratObject(count)
+dim(mono)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{R}
+mt = PercentageFeatureSet(mono, pattern = "^MT-")
+mono[["percent.mt"]] = mt
+VlnPlot(mono, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+c = GetAssayData(object = mono, slot = "counts")
+
+
+gene_filt  = rowSums(c != 0) >=5
+
+cell_filt = (mono$nFeature_RNA <=5000) & (mono$nFeature_RNA >=750) & (mono$percent.mt <= 30)
+mono = mono[gene_filt, cell_filt]
+```
+
+```{R}
+mono = NormalizeData(mono)
+mono = FindVariableFeatures(mono)
+mono = ScaleData(mono)
+
+
+mono = RunPCA(mono)
+ElbowPlot(mono)
+
+
+mono <- FindNeighbors(mono, dims = 1:10, reduction = "pca")
+mono <- FindClusters(mono, resolution = .25, cluster.name = "unintegrated_clusters")
+```
+
+```{R}
+mono <- RunUMAP(mono, dims = 1:10)
+DimPlot(mono, reduction = "umap")
+
+
+```
+
+```{R}
+graph = nng(mono[["pca"]][,1:10],k = 10)
+graph = as.undirected(graph, mode = "collapse")
+mono.clust = cluster_louvain(graph)
+mono_umap = umap(mono[["pca"]][,1:10])
+plot(mono_umap$layout[,1],mono_umap$layout[,2], col = mono.clust$membership)
+legend('bottomright', legend = levels(as.factor(mono.clust$membership)), col = levels(as.factor(mono.clust$membership)), pch = 1)
+```
