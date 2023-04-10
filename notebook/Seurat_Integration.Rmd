@@ -17,6 +17,8 @@ library(igraph)
 library(umap)
 
 dirs = list.dirs("../data/raw", recursive = FALSE)
+counts = NULL
+grps = NULL
 
 for(dir in list.dirs("../data/raw", recursive = FALSE)){
   print(dir)
@@ -28,12 +30,12 @@ for(dir in list.dirs("../data/raw", recursive = FALSE)){
   count = Matrix::readMM(count_path)
   barcodes = read.table(barcodes_path)
   features = read.table(features_path)
+  group = rep(substring(dir, 13), dim(count)[2])
   
   if(mean(grepl("_", features[,1])) == 1){
+    count = count[grepl("mm10___", features[,1]),]
+    features = features[grepl("mm10___", features[,1]),]
     features[,1] = substring(features[,1], 8)
-  }
-  
-  if(mean(grepl("_", features[,2])) == 1){
     features[,2] = substring(features[,2], 8)
   }
   
@@ -42,33 +44,46 @@ for(dir in list.dirs("../data/raw", recursive = FALSE)){
   
   rownames(count)[which(duplicated(features[,2]))] = features[which(duplicated(features[,2])),1]
   
-  mono = CreateSeuratObject(count)
-
-  cell_filt = (mono$nFeature_RNA >=200)
-  gene_filt  = rowSums(count != 0) >=5
-  mono = mono[gene_filt, cell_filt]  
-  
-  mt = PercentageFeatureSet(mono, pattern = "^MT-")
-  mono[["percent.mt"]] = mt
-  VlnPlot(mono, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
-  
-  c = GetAssayData(object = mono, slot = "counts")
-
-  
-  cell_filt = (mono$nFeature_RNA <=5000) & (mono$nFeature_RNA >=750) & (mono$percent.mt <= 30)
-  mono = mono[, cell_filt]  
-  
-  mono = NormalizeData(mono, verbose = FALSE)
-  mono = FindVariableFeatures(mono, verbose = FALSE)
-  mono = ScaleData(mono, verbose = FALSE)
-  mono = RunPCA(mono, verbose = FALSE)
-  
-  mono <- FindNeighbors(mono, dims = 1:10, reduction = "pca", verbose = FALSE)
-  mono <- FindClusters(mono, resolution = .25, cluster.name = "unintegrated_clusters", verbose = FALSE)
-  
-  mono <- RunUMAP(mono, dims = 1:10, verbose = FALSE)
-  print(DimPlot(mono, reduction = "umap"))
+  if (is.null(counts)){
+    counts = count
+    grps = group
+  }
+  else{
+    counts = cbind(counts, count)
+    grps = c(grps, group)
+  }
 }
+  
+rownames(counts)[grepl("^Mt", features[,2])] = features[grepl("^Mt", features[,2]),2]
+mono = CreateSeuratObject(counts)
+mono[["groups"]] = grps
+
+cell_filt = (mono$nFeature_RNA >=200)
+gene_filt  = rowSums(count != 0) >=5
+mono = mono[gene_filt, cell_filt]  
+
+
+mt = PercentageFeatureSet(mono, pattern = "^MT-")
+mono[["percent.mt"]] = mt
+VlnPlot(mono, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+c = GetAssayData(object = mono, slot = "counts")
+
+
+cell_filt = (mono$nFeature_RNA <=5000) & (mono$nFeature_RNA >=750) & (mono$percent.mt <= 30)
+mono = mono[, cell_filt]  
+
+mono = NormalizeData(mono, verbose = FALSE)
+mono = FindVariableFeatures(mono, verbose = FALSE)
+mono = ScaleData(mono, verbose = FALSE)
+mono = RunPCA(mono, verbose = FALSE)
+
+mono <- FindNeighbors(mono, dims = 1:10, reduction = "pca", verbose = FALSE)
+mono <- FindClusters(mono, resolution = .25, cluster.name = "unintegrated_clusters", verbose = FALSE)
+
+mono <- RunUMAP(mono, dims = 1:10, verbose = FALSE)
+print(DimPlot(mono, reduction = "umap"))
+
 ```
 
 
@@ -142,4 +157,48 @@ mono.clust = cluster_louvain(graph)
 mono_umap = umap(mono[["pca"]][,1:10])
 plot(mono_umap$layout[,1],mono_umap$layout[,2], col = mono.clust$membership)
 legend('bottomright', legend = levels(as.factor(mono.clust$membership)), col = levels(as.factor(mono.clust$membership)), pch = 1)
+```
+
+```{R}
+#markers = FindAllMarkers(object = mono)
+#write.csv(markers, '../data/processed/markers.csv')
+
+markers = read.csv('../data/processed/markers.csv')
+char_genes = read.csv('../data/processed/KollaCellClusterGenes.csv')
+hits_mat = NULL
+for(clust in 0:17){
+  hits = c()
+  for(cell_type in levels(as.factor(char_genes[,2]))){
+    clust_mark = markers[markers[,'cluster'] == clust,'gene'][1:150]
+    ct_filt = char_genes[,2] == cell_type
+    ct_mark = char_genes[ct_filt,1][1:150]
+    hits = c(hits,length(intersect(toupper(clust_mark), toupper(ct_mark))))
+  }
+  if(is.null(hits_mat)){
+    hits_mat = as.matrix(hits)
+  }
+  else{
+    hits_mat = cbind(hits_mat, hits)
+  }
+}
+rownames(hits_mat) = levels(as.factor(char_genes[,2]))
+colnames(hits_mat) = 0:17
+
+hits_mat
+norm_mat
+```
+
+```{R}
+    diff = setdiff(rownames(count), rownames(counts))
+    if(! is.null(diff)){
+      to_add = matrix(0, length(diff), dim(counts)[2])
+      rownames(to_add) = diff
+      counts = rbind(counts, to_add)
+    }
+    diff = setdiff(rownames(counts), rownames(count))
+    if(! is.null(diff)){
+      to_add = matrix(0, length(diff), dim(count)[2])
+      rownames(to_add) = diff
+      count = rbind(count, to_add)
+    }
 ```
