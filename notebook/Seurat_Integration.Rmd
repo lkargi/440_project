@@ -10,12 +10,734 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{R}
 library(Seurat)
+library(RColorBrewer)
+library(SeuratDisk)
+library(SeuratData)
 library(Matrix)
 library(class)
 library(cccd)
 library(igraph)
 library(umap)
 
+#Initializing
+set.seed(4202023)
+coch.p8.list = list()
+coch.p15.list = list()
+
+#Loading Data
+for(dir in list.dirs("../data/raw", recursive = FALSE)){
+  print(dir)
+  p8 = grepl("p8", dir)
+  
+  count_path = paste0(dir,'/matrix.mtx')
+  barcodes_path = paste0(dir,'/barcodes.tsv')
+  features_path = paste0(dir,'/features.tsv')
+  
+  count = Matrix::readMM(count_path)
+  barcodes = read.table(barcodes_path)
+  features = read.table(features_path)
+  group = rep(substring(dir, 13), dim(count)[2])
+  
+  if(mean(grepl("_", features[,1])) == 1){
+    count = count[grepl("mm10___", features[,1]),]
+    features = features[grepl("mm10___", features[,1]),]
+    features[,1] = substring(features[,1], 8)
+    features[,2] = substring(features[,2], 8)
+  }
+  colnames(count) = barcodes[,1]
+  rownames(count) = toupper(features[,2])
+  
+  rownames(count)[which(duplicated(features[,2]))] = features[which(duplicated(features[,2])),1]
+  
+  rownames(count)[grepl("^Mt", features[,2])] = features[grepl("^Mt", features[,2]),2]
+  
+
+
+  
+  coch = CreateSeuratObject(count)
+  group = rep(substring(dir, 13), dim(count)[2])
+  coch[["groups"]] = group
+  
+  cell_filt = (coch$nFeature_RNA >=200)
+  gene_filt  = rowSums(count != 0) >=5
+  coch = coch[gene_filt, cell_filt]  
+  
+  
+  mt = PercentageFeatureSet(coch, pattern = "^MT-")
+  coch[["percent.mt"]] = mt
+  print(VlnPlot(coch, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3))
+  
+  c = GetAssayData(object = coch, slot = "counts")
+  
+  
+  cell_filt = (coch$nFeature_RNA <=5000) & (coch$nFeature_RNA >=750) & (coch$percent.mt <= 30)
+  coch = coch[, cell_filt]  
+  
+  
+  coch = NormalizeData(coch)
+  coch = FindVariableFeatures(coch, selection.method = "vst", nfeatures = 2000)
+  
+  coch = list(dir = coch)
+  if(p8){
+    coch.p8.list = append(coch.p8.list, coch)
+    
+  }
+  else{
+    coch.p15.list = append(coch.p15.list, coch)
+  }
+  print(coch)
+}
+
+#Integrating Data
+features.p8 = SelectIntegrationFeatures(object.list = coch.p8.list)
+features.p15 = SelectIntegrationFeatures(object.list = coch.p15.list)
+
+coch.p8.anchors <- FindIntegrationAnchors(object.list = coch.p8.list, anchor.features = features.p8)
+coch.p8 = IntegrateData(anchorset = coch.p8.anchors)
+
+coch.p15.anchors <- FindIntegrationAnchors(object.list = coch.p15.list, anchor.features = features.p15)
+coch.p15 = IntegrateData(anchorset = coch.p15.anchors)
+
+#Clustering
+set.seed(4202023)
+coch.p8 = ScaleData(coch.p8, verbose = FALSE)
+coch.p8 = RunPCA(coch.p8)
+coch.p8 <- FindNeighbors(coch.p8, dims = 1:50, reduction = "pca", verbose = FALSE)
+coch.p8 <- FindClusters(coch.p8, resolution = .4, cluster.name = "unintegrated_clusters", verbose = FALSE)
+coch.p8 <- RunUMAP(coch.p8, dims = 1:50, verbose = FALSE)
+
+set.seed(4202023)
+coch.p15 = ScaleData(coch.p15, verbose = FALSE)
+coch.p15 = RunPCA(coch.p15)
+coch.p15 <- FindNeighbors(coch.p15, dims = 1:50, reduction = "pca", verbose = FALSE)
+coch.p15 <- FindClusters(coch.p15, resolution = .25, cluster.name = "unintegrated_clusters", verbose = FALSE)
+coch.p15 <- RunUMAP(coch.p15, dims = 1:50, verbose = FALSE)
+
+
+```
+
+```{R}
+print(DimPlot(coch.p8, reduction = "umap"))
+print(DimPlot(coch.p15, reduction = "umap"))
+```
+
+```{R}
+for(clust in 0:19){
+  print(table(coch.p15[,coch.p15$seurat_clusters == clust][["groups"]]))
+}
+
+for(clust in 0:17){
+  print(table(coch.p8[,coch.p8$seurat_clusters == clust][["groups"]]))
+}
+```
+
+```{R}
+#find markers
+markers.p8 = FindAllMarkers(object = coch.p8)
+markers.p15 = FindAllMarkers(object = coch.p15)
+```
+
+```{R}
+#Label Clusters
+#write.csv(markers, '../data/processed/markers.csv')
+#write.csv(mono$seurat_clusters, '../data/processed/clusters.csv')
+
+#markers = read.csv('../data/processed/markers.csv')
+#char_genes = read.csv('../data/processed/KollaCellClusterGenes.csv')
+
+num_clust = length(levels(coch.p8$seurat_clusters))-1
+hits_mat = NULL
+for(clust in 0:num_clust){
+  hits = c()
+  for(cell_type in levels(as.factor(char_genes[,2]))){
+    clust_mark = markers.p8[markers.p8[,'cluster'] == clust,'gene']
+    ct_filt = char_genes[,2] == cell_type
+    ct_mark = char_genes[ct_filt,1]
+    matches = match(toupper(ct_mark),toupper(clust_mark))
+    hits = c(hits, median(matches[!is.na(matches)]))
+    
+    #hits = c(hits,length(intersect(toupper(clust_mark), toupper(ct_mark))))
+  }
+  if(is.null(hits_mat)){
+    hits_mat = as.matrix(hits)
+  }
+  else{
+    hits_mat = cbind(hits_mat, hits)
+  }
+}
+rownames(hits_mat) = levels(as.factor(char_genes[,2]))
+colnames(hits_mat) = 0:num_clust
+
+hits_mat
+
+
+```
+
+
+```{R}
+#write.csv(markers, '../data/processed/markers.csv')
+#write.csv(mono$seurat_clusters, '../data/processed/clusters.csv')
+
+#markers = read.csv('../data/processed/markers.csv')
+char_genes = read.csv('../data/processed/KollaCellClusterGenes.csv')
+
+
+num_clust = length(levels(coch.p8$seurat_clusters))-1
+hits_mat = NULL
+for(clust in 0:num_clust){
+  hits = c()
+  for(cell_type in levels(as.factor(char_genes[,2]))){
+    clust_mark = markers.p8[markers.p8[,'cluster'] == clust,'gene'][1:150]
+    ct_filt = char_genes[,2] == cell_type
+    ct_mark = char_genes[ct_filt,1][1:150]
+    hits = c(hits,length(intersect(toupper(clust_mark), toupper(ct_mark))))
+  }
+  if(is.null(hits_mat)){
+    hits_mat = as.matrix(hits)
+  }
+  else{
+    hits_mat = cbind(hits_mat, hits)
+  }
+}
+rownames(hits_mat) = levels(as.factor(char_genes[,2]))
+colnames(hits_mat) = 0:num_clust
+
+hits_mat
+
+```
+
+
+```{R}
+#write.csv(markers, '../data/processed/markers.csv')
+#write.csv(mono$seurat_clusters, '../data/processed/clusters.csv')
+
+#markers = read.csv('../data/processed/markers.csv')
+#char_genes = read.csv('../data/processed/KollaCellClusterGenes.csv')
+
+num_clust = length(levels(coch.p8$seurat_clusters))-1
+hits_mat = NULL
+for(clust in 0:num_clust){
+  hits = c()
+  for(cell_type in levels(as.factor(char_genes[,2]))){
+    clust_mark = markers.p8[markers.p8[,'cluster'] == clust,'gene']
+    ct_filt = char_genes[,2] == cell_type
+    ct_mark = char_genes[ct_filt,1]
+    matches = match(toupper(ct_mark),toupper(clust_mark))
+    hits = c(hits, median(matches[!is.na(matches)]))
+    
+    #hits = c(hits,length(intersect(toupper(clust_mark), toupper(ct_mark))))
+  }
+  if(is.null(hits_mat)){
+    hits_mat = as.matrix(hits)
+  }
+  else{
+    hits_mat = cbind(hits_mat, hits)
+  }
+}
+rownames(hits_mat) = levels(as.factor(char_genes[,2]))
+colnames(hits_mat) = 0:num_clust
+
+hits_mat
+```
+
+```{R}
+#Label Clusters
+#write.csv(markers, '../data/processed/markers.csv')
+#write.csv(mono$seurat_clusters, '../data/processed/clusters.csv')
+
+#markers = read.csv('../data/processed/markers.csv')
+#char_genes = read.csv('../data/processed/KollaCellClusterGenes.csv')
+
+num_clust = length(levels(coch.p8$seurat_clusters))-1
+hits_mat = NULL
+for(clust in 0:num_clust){
+  hits = c()
+  for(cell_type in levels(as.factor(char_genes[,2]))){
+    clust_mark = markers.p8[markers.p8[,'cluster'] == clust,'gene']
+    ct_filt = char_genes[,2] == cell_type
+    ct_mark = char_genes[ct_filt,1]
+    matches = match(toupper(ct_mark),toupper(clust_mark))
+    hits = c(hits, median(matches[!is.na(matches)]))
+    
+    #hits = c(hits,length(intersect(toupper(clust_mark), toupper(ct_mark))))
+  }
+  if(is.null(hits_mat)){
+    hits_mat = as.matrix(hits)
+  }
+  else{
+    hits_mat = cbind(hits_mat, hits)
+  }
+}
+rownames(hits_mat) = levels(as.factor(char_genes[,2]))
+colnames(hits_mat) = 0:num_clust
+
+hits_mat
+
+
+```
+
+
+```{R}
+#write.csv(markers, '../data/processed/markers.csv')
+#write.csv(mono$seurat_clusters, '../data/processed/clusters.csv')
+
+#markers = read.csv('../data/processed/markers.csv')
+char_genes = read.csv('../data/processed/KollaCellClusterGenes.csv')
+
+
+num_clust = length(levels(coch.p15$seurat_clusters))-1
+hits_mat = NULL
+for(clust in 0:num_clust){
+  hits = c()
+  for(cell_type in levels(as.factor(char_genes[,2]))){
+    clust_mark = markers.p15[markers.p15[,'cluster'] == clust,'gene'][1:150]
+    ct_filt = char_genes[,2] == cell_type
+    ct_mark = char_genes[ct_filt,1][1:150]
+    hits = c(hits,length(intersect(toupper(clust_mark), toupper(ct_mark))))
+  }
+  if(is.null(hits_mat)){
+    hits_mat = as.matrix(hits)
+  }
+  else{
+    hits_mat = cbind(hits_mat, hits)
+  }
+}
+rownames(hits_mat) = levels(as.factor(char_genes[,2]))
+colnames(hits_mat) = 0:num_clust
+
+hits_mat
+
+```
+
+
+```{R}
+#write.csv(markers, '../data/processed/markers.csv')
+#write.csv(mono$seurat_clusters, '../data/processed/clusters.csv')
+
+#markers = read.csv('../data/processed/markers.csv')
+#char_genes = read.csv('../data/processed/KollaCellClusterGenes.csv')
+
+num_clust = length(levels(coch.p15$seurat_clusters))-1
+hits_mat = NULL
+for(clust in 0:num_clust){
+  hits = c()
+  for(cell_type in levels(as.factor(char_genes[,2]))){
+    clust_mark = markers.p15[markers.p15[,'cluster'] == clust,'gene']
+    ct_filt = char_genes[,2] == cell_type
+    ct_mark = char_genes[ct_filt,1]
+    matches = match(toupper(ct_mark),toupper(clust_mark))
+    hits = c(hits, median(matches[!is.na(matches)]))
+    
+    #hits = c(hits,length(intersect(toupper(clust_mark), toupper(ct_mark))))
+  }
+  if(is.null(hits_mat)){
+    hits_mat = as.matrix(hits)
+  }
+  else{
+    hits_mat = cbind(hits_mat, hits)
+  }
+}
+rownames(hits_mat) = levels(as.factor(char_genes[,2]))
+colnames(hits_mat) = 0:num_clust
+
+hits_mat
+```
+
+
+```{R}
+#markers.p15 = FindAllMarkers(object = coch.p15)
+#write.csv(markers, '../data/processed/markers.csv')
+#write.csv(mono$seurat_clusters, '../data/processed/clusters.csv')
+
+#markers = read.csv('../data/processed/markers.csv')
+#char_genes = read.csv('../data/processed/KollaCellClusterGenes.csv')
+
+
+num_clust = length(levels(coch.p15$seurat_clusters))-1
+hits_mat = NULL
+for(clust in 0:num_clust){
+  hits = c()
+  for(cell_type in levels(as.factor(char_genes[,2]))){
+    clust_mark = markers.p15[markers.p15[,'cluster'] == clust,'gene'][1:150]
+    ct_filt = char_genes[,2] == cell_type
+    ct_mark = char_genes[ct_filt,1][1:150]
+    hits = c(hits,length(intersect(toupper(clust_mark), toupper(ct_mark))))
+  }
+  if(is.null(hits_mat)){
+    hits_mat = as.matrix(hits)
+  }
+  else{
+    hits_mat = cbind(hits_mat, hits)
+  }
+}
+rownames(hits_mat) = levels(as.factor(char_genes[,2]))
+colnames(hits_mat) = 0:num_clust
+
+hits_mat
+norm_mat
+
+
+```
+```{R}
+for(clust in 0:17){
+  print(table(mono[,mono$seurat_clusters == clust][["groups"]]))
+}
+```
+
+```{R}
+DimPlot(mono[,mono$groups == "s9_rosa26GA_p15"], reduction = "umap")
+```
+
+```{R}
+ct_labels = as.vector(coch.p8$seurat_clusters)
+ct_labels[] = "Unclassified"
+ct_labels[(coch.p8$seurat_clusters == 0) | (coch.p8$seurat_clusters == 1) | (coch.p8$seurat_clusters == 2) | (coch.p8$seurat_clusters == 3) ] = "Deiters/Pillar/Phalangeal Cells"
+
+ct_labels[(coch.p8$seurat_clusters == 8) | (coch.p8$seurat_clusters == 10)] = "Roof Cells"
+ct_labels[(coch.p8$seurat_clusters == 6) | (coch.p8$seurat_clusters == 14)] = "Hair Cells"
+ct_labels[(coch.p8$seurat_clusters == 4) | (coch.p8$seurat_clusters == 9)] = "Interdental Cells"
+#ct_labels[(coch.p8$seurat_clusters == 7)] = "IPhC"
+ct_labels[(coch.p8$seurat_clusters == 17) | (coch.p8$seurat_clusters == 19)] = "Glia Cells"
+ct_labels[(coch.p8$seurat_clusters == 5) | (coch.p8$seurat_clusters == 15) | (coch.p8$seurat_clusters == 16)] = "Lateral Greater Epithelial Range (LGER)"
+#ct_labels[(coch.p8$seurat_clusters == 18)] = "Claudius"
+
+
+coch.p8[["Annotation"]] = ct_labels
+DimPlot(coch.p8, reduction = 'umap',group.by = "Annotation", cols = c("red", "green", "blue", "purple", 
+                                                                                     "cyan", "orange","gray"))
+ggsave(
+  "coch-p8-umap.png",
+  width = 7.5,
+  height = 5,
+  dpi = 1200
+)
+```
+```{R}
+FeaturePlot(coch.p15, features = "FOXG1")
+```
+
+```{R}
+SaveH5Seurat(coch.p8, "cochlear_p8" ,overwrite = TRUE)
+SaveH5Seurat(coch.p15, "cochlear_p15" ,overwrite = TRUE)
+```
+
+
+```{R}
+ct_labels = as.vector(coch.p15$seurat_clusters)
+ct_labels[] = "Unclassified"
+ct_labels[(coch.p15$seurat_clusters == 7) | (coch.p15$seurat_clusters == 4) | (coch.p15$seurat_clusters == 2)] = "Deiters/Pillar/Phalangeal Cells"
+ct_labels[(coch.p15$seurat_clusters == 14)] = "Roof Cells"
+ct_labels[(coch.p15$seurat_clusters == 11)] = "Hair Cells"
+ct_labels[(coch.p15$seurat_clusters == 0)] = "Interdental Cells"
+ct_labels[(coch.p15$seurat_clusters == 6)] = "Glia Cells"
+ct_labels[(coch.p15$seurat_clusters == 5) | (coch.p15$seurat_clusters == 8) | (coch.p15$seurat_clusters == 17)] = "LGER"
+
+
+
+coch.p15[["Annotation"]] = ct_labels
+DimPlot(coch.p15, reduction = 'umap',group.by = "Annotation", cols = c("red", "green", "blue", "purple", 
+                                                                                     "cyan", "orange","gray"))
+ggsave(
+  "coch-p15-umap.png",
+  width = 7.5,
+  height = 5,
+  dpi = 1200
+)
+
+```
+
+
+
+```{R}
+library(slingshot)
+
+pal <- c(RColorBrewer::brewer.pal(9, "Set1"), RColorBrewer::brewer.pal(8, "Set2"))
+
+umap = Embeddings(coch.p8[["umap"]])
+for(start in c("Deiters/Pillar/Phalangeal Cells", "Glia Cells", "Interdental Cells", "LGER", "Roof Cells")){
+  filt = (ct_labels == start) | (ct_labels == "Hair Cells")
+  lineages <- getLineages(data = Embeddings(coch.p8, reduction = "pca")[filt,1:50],
+                          clusterLabels = ct_labels[filt],
+                          end.clus = "Hair Cells",
+                          start.clus = start)
+  
+  #
+  #plot(umap[filt, 1:2], col = pal[as.factor(ct_labels[filt])], cex = 0.5, pch = 16)
+  #lines(SlingshotDataSet(lineages), lwd = 3, col = "black")
+  
+  crv = getCurves(lineages)
+  psd_t = slingPseudotime(crv)
+  
+  colors <- rev(colorRampPalette(brewer.pal(11,'Spectral')[-6])(100))
+  plotcol <- colors[cut(psd_t, breaks=100)]
+  
+  png(paste0(paste0('../fig/Figure4_P8', substr(start,1,5)), '.png'), width = 1200, height = 1100)
+  #layout(matrix(1:2,ncol=2), width = c(2,.75),height = c(1,1))
+  legend_image <- as.raster(matrix(rev(colors), ncol=1))
+  par(
+    mar      = c(6, 6, 3, 3),
+    cex.axis = 2.5,
+    cex.lab  = 2.5
+  )
+  plot(umap[filt, 1:2], col = plotcol, cex = 2.5, pch = 16)
+  #title(paste0(start," Development"))
+  plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = 'Legend')
+  text(x=1.5, y = seq(0,1,l=3), labels = seq(0,1,l=3))
+  rasterImage(legend_image, 0, 0, 1,1)
+  dev.off()
+  
+}
+```
+
+```{R}
+library(slingshot)
+
+pal <- c(RColorBrewer::brewer.pal(9, "Set1"), RColorBrewer::brewer.pal(8, "Set2"))
+
+umap = Embeddings(coch.p15[["umap"]])
+for(start in c("Deiters/Pillar/Phalangeal Cells", "Glia Cells", "Interdental Cells", "LGER", "OC90+ Cells")){
+  filt = (ct_labels == start) | (ct_labels == "Hair Cells")
+  lineages <- getLineages(data = Embeddings(coch.p15, reduction = "pca")[filt,1:50],
+                          clusterLabels = ct_labels[filt],
+                          end.clus = "Hair Cells",
+                          start.clus = start)
+  
+  #plot(umap[filt, 1:2], col = pal[as.factor(ct_labels[filt])], cex = 0.5, pch = 16)
+  #lines(SlingshotDataSet(lineages), lwd = 3, col = "black")
+  
+  crv = getCurves(lineages)
+  psd_t = slingPseudotime(crv)
+  
+  colors <- rev(colorRampPalette(brewer.pal(11,'Spectral')[-6])(100))
+  plotcol <- colors[cut(psd_t, breaks=100)]
+  
+  #png(paste0(paste0('../fig/Figure4_', substr(start,1,5)), '.png'), width  = 500, height = 400)
+   png(paste0(paste0('../fig/Figure4_P15', substr(start,1,5)), '.png'), width = 1200, height = 1100)
+  #layout(matrix(1:2,ncol=2), width = c(2,.75),height = c(1,1))
+  legend_image <- as.raster(matrix(rev(colors), ncol=1))
+  par(
+    mar      = c(6, 6, 3, 3),
+    cex.axis = 2.5,
+    cex.lab  = 2.5,
+    cex.main = 4
+  )
+  plot(umap[filt, 1:2], col = plotcol, cex = 2.5, pch = 16)
+  title(paste0(start," Development"))
+  plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = 'Pseudotime')
+  text(x=1.5, y = seq(0,1,l=3), labels = seq(0,1,l=3), cex = 2.5)
+  rasterImage(legend_image, 0, 0, 1,1)
+  dev.off()
+}
+```
+
+
+```{R}
+library(limma)
+library(org.Mm.eg.db)
+
+tab <- getGeneKEGGLinks(species="mmu")
+tab$Symbol <- mapIds(org.Mm.eg.db, tab$GeneID,
+                     column="SYMBOL", keytype="ENTREZID")
+
+notch_mm = tab[tab$PathwayID == "mmu04330",]
+notch_mm
+
+plot(psd_t, coch.p8[["RNA"]]["SOX9",filt])
+
+vec_pairwise_sub <- function(c,u){
+  return(abs(u-c))
+}
+psd_t <- as.matrix(psd_t)
+tt <- apply(psd_t,1,vec_pairwise_sub,kern_avg$x)
+
+
+colors <- rev(colorRampPalette(brewer.pal(11,'Spectral')[-6])(400))
+colors <- rev(viridis(400))
+log_col = log(rowSums(tt<1.25))
+plotcol <- colors[cut(log_col, breaks=400)]
+kern_avg = ksmooth(psd_t, coch.p8[["RNA"]]["SOX9",filt], kernel = "normal", bandwidth = 5)
+layout(matrix(1:2,ncol=2), width = c(2,.75),height = c(1,1))
+plot(kern_avg$x/max(kern_avg$x),  kern_avg$y, col = plotcol, xlab = 'Pseudotime', ylab = 'SOX9 Expression')
+legend_image <- as.raster(matrix(rev(colors), ncol=1))
+title("Moving Average Expression")
+plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = 'Log Density', cex.main=.75)
+text(x=1.5, y = seq(0,1,l=3), labels = seq(round(min(log_col)),round(max(log_col)),l=3))
+rasterImage(legend_image, 0, 0, 1,1)
+
+
+psd_t <- as.matrix(psd_t)
+tt <- apply(psd_t,1,vec_pairwise_sub,kern_avg$x)
+
+colors <- rev(colorRampPalette(brewer.pal(11,'Spectral')[-6])(400))
+colors <- rev(viridis(400))
+log_col = log(rowSums(tt<1.25))
+plotcol <- colors[cut(log_col, breaks=400)]
+kern_avg = ksmooth(psd_t, coch.p15[["RNA"]]["SOX9",filt], kernel = "normal", bandwidth = 5)
+layout(matrix(1:2,ncol=2), width = c(2,.75),height = c(1,1))
+plot(kern_avg$x/max(kern_avg$x),  kern_avg$y, col = plotcol, xlab = 'Pseudotime', ylab = 'SOX9 Expression')
+legend_image <- as.raster(matrix(rev(colors), ncol=1))
+title("Moving Average Expression")
+plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = 'Log Density', cex.main=.75)
+text(x=1.5, y = seq(0,1,l=3), labels = seq(round(min(log_col)),round(max(log_col)),l=3))
+rasterImage(legend_image, 0, 0, 1,1)
+
+
+kern_avg = ksmooth(psd_t, coch.p15[["RNA"]]["NOTCH1",filt], kernel = "normal", bandwidth = 5)
+plot(kern_avg$x,  kern_avg$y, type = 'l',)
+
+
+
+kern_avg = ksmooth(psd_t, coch.p8[["RNA"]]["NOTCH1",filt], kernel = "normal", bandwidth = 5)
+plot(kern_avg$x,  kern_avg$y, col = plotcol)
+```
+```{R}
+start = "Deiters/Pillar/Phalangeal Cells"
+ct_labels = coch.p8[["Annotation"]]
+filt = (ct_labels == start) | (ct_labels == "Hair Cells")
+lineages <- getLineages(data = Embeddings(coch.p8, reduction = "pca")[filt,1:50],
+                        clusterLabels = ct_labels[filt],
+                        end.clus = "Hair Cells",
+                        start.clus = start)
+
+#plot(umap[filt, 1:2], col = pal[as.factor(ct_labels[filt])], cex = 0.5, pch = 16)
+#lines(SlingshotDataSet(lineages), lwd = 3, col = "black")
+
+crv = getCurves(lineages)
+psd_t = slingPseudotime(crv)
+psd_t <- as.matrix(psd_t)
+
+
+
+
+kern_avg = ksmooth(psd_t, coch.p8[["RNA"]]["NOTCH1",as.vector(filt)], kernel = "normal", bandwidth = 5)
+tt <- apply(psd_t,1,vec_pairwise_sub,kern_avg$x)
+colors <- rev(colorRampPalette(brewer.pal(11,'Spectral')[-6])(400))
+colors <- rev(viridis(400))
+log_col = log(rowSums(tt<1.25))
+
+plotcol <- colors[cut(log_col, breaks=400)]
+layout(matrix(1:2,ncol=2), width = c(2,.75),height = c(1,1))
+plot(kern_avg$x/max(kern_avg$x),  kern_avg$y, col = plotcol, xlab = 'Pseudotime', ylab = 'SOX9 Expression')
+legend_image <- as.raster(matrix(rev(colors), ncol=1))
+title("Moving Average Expression")
+plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = 'Log Density', cex.main=.75)
+text(x=1.5, y = seq(0,1,l=3), labels = seq(round(min(log_col)),round(max(log_col)),l=3))
+rasterImage(legend_image, 0, 0, 1,1)
+```
+
+```{R}
+start = "Deiters/Pillar/Phalangeal Cells"
+ct_labels = coch.p15[["Annotation"]]
+filt = (ct_labels == start) | (ct_labels == "Hair Cells")
+lineages <- getLineages(data = Embeddings(coch.p15, reduction = "pca")[filt,1:50],
+                        clusterLabels = ct_labels[filt],
+                        end.clus = "Hair Cells",
+                        start.clus = start)
+
+#plot(umap[filt, 1:2], col = pal[as.factor(ct_labels[filt])], cex = 0.5, pch = 16)
+#lines(SlingshotDataSet(lineages), lwd = 3, col = "black")
+
+crv = getCurves(lineages)
+psd_t = slingPseudotime(crv)
+psd_t <- as.matrix(psd_t)
+
+
+
+
+kern_avg = ksmooth(psd_t, coch.p15[["RNA"]]["NOTCH1",as.vector(filt)], kernel = "normal", bandwidth = 5)
+tt <- apply(psd_t,1,vec_pairwise_sub,kern_avg$x)
+colors <- rev(colorRampPalette(brewer.pal(11,'Spectral')[-6])(400))
+colors <- rev(viridis(400))
+log_col = log(rowSums(tt<1.25))
+
+plotcol <- colors[cut(log_col, breaks=400)]
+layout(matrix(1:2,ncol=2), width = c(2,.75),height = c(1,1))
+plot(kern_avg$x/max(kern_avg$x),  kern_avg$y, col = plotcol, xlab = 'Pseudotime', ylab = 'SOX9 Expression')
+legend_image <- as.raster(matrix(rev(colors), ncol=1))
+title("Moving Average Expression")
+plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = 'Log Density', cex.main=.75)
+text(x=1.5, y = seq(0,1,l=3), labels = seq(round(min(log_col)),round(max(log_col)),l=3))
+rasterImage(legend_image, 0, 0, 1,1)
+```
+
+
+```{R}
+start = "Deiters/Pillar/Phalangeal Cells"
+filt = (ct_labels == start) | (ct_labels == "Hair Cells")
+lineages <- getLineages(data = Embeddings(coch.p8, reduction = "pca")[filt,1:50],
+                        clusterLabels = ct_labels[filt],
+                        end.clus = "Hair Cells",
+                        start.clus = start)
+
+#plot(umap[filt, 1:2], col = pal[as.factor(ct_labels[filt])], cex = 0.5, pch = 16)
+#lines(SlingshotDataSet(lineages), lwd = 3, col = "black")
+
+crv = getCurves(lineages)
+psd_t = slingPseudotime(crv)
+psd_t <- as.matrix(psd_t)
+tt <- apply(psd_t,1,vec_pairwise_sub,kern_avg$x)
+
+
+
+
+png('../fig/Figure4_P8_SOX9.png', width = 1100, height = 1000)
+par(
+    mar      = c(10, 10, 5, 5)
+  )
+colors <- rev(colorRampPalette(brewer.pal(11,'Spectral')[-6])(400))
+colors <- rev(viridis(400))
+log_col = log(rowSums(tt<1.25))
+plotcol <- colors[cut(log_col, breaks=400)]
+kern_avg = ksmooth(psd_t, coch.p8[["RNA"]]["SOX9",filt], kernel = "normal", bandwidth = 10)
+#layout(matrix(1:2,ncol=2), width = c(2,.75),height = c(1,1))
+plot(kern_avg$x/max(kern_avg$x),  kern_avg$y, col = plotcol, xlab = 'Pseudotime', ylab = 'SOX9 Expression', cex = 3, cex.lab  = 3, cex.axis = 3)
+#legend_image <- as.raster(matrix(rev(colors), ncol=1))
+title("Moving Average Expression", cex.main = 4)
+```
+
+```{R}
+start = "Deiters/Pillar/Phalangeal Cells"
+
+filt = (ct_labels == start) | (ct_labels == "Hair Cells")
+lineages <- getLineages(data = Embeddings(coch.p15, reduction = "pca")[filt,1:50],
+                        clusterLabels = ct_labels[filt],
+                        end.clus = "Hair Cells",
+                        start.clus = start)
+
+#plot(umap[filt, 1:2], col = pal[as.factor(ct_labels[filt])], cex = 0.5, pch = 16)
+#lines(SlingshotDataSet(lineages), lwd = 3, col = "black")
+
+crv = getCurves(lineages)
+psd_t = slingPseudotime(crv)
+psd_t <- as.matrix(psd_t)
+tt <- apply(psd_t,1,vec_pairwise_sub,kern_avg$x)
+
+
+
+
+#png('../fig/Figure4_P15_SOX9.png', width = 1100, height = 1000)
+#par(
+#    mar      = c(10, 10, 5, 5)
+#  )
+colors <- rev(colorRampPalette(brewer.pal(11,'Spectral')[-6])(400))
+colors <- rev(viridis(400))
+log_col = log(rowSums(tt<1.25))
+plotcol <- colors[cut(log_col, breaks=400)]
+kern_avg = ksmooth(psd_t, coch.p15[["RNA"]]["SOX9",filt], kernel = "normal", bandwidth = 5)
+layout(matrix(1:2,ncol=2), width = c(2,.75),height = c(1,1))
+plot(kern_avg$x/max(kern_avg$x),  kern_avg$y, col = plotcol, xlab = 'Pseudotime', ylab = 'SOX9 Expression')#, cex = 3, cex.lab  = 3, cex.axis = 3)
+legend_image <- as.raster(matrix(rev(colors), ncol=1))
+title("Moving Average Expression")#, cex.main = 4)
+plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = 'Log Density')#, cex.main=1)
+text(x=1.5, y = seq(0,1,l=3), labels = seq(round(min(log_col)),round(max(log_col)),l=3))#, cex = 1)
+rasterImage(legend_image, 0, 0, 1,1)
+```
+
+
+
+
+
+```{R}
 dirs = list.dirs("../data/raw", recursive = FALSE)
 counts = NULL
 grps = NULL
@@ -84,8 +806,8 @@ mono <- FindClusters(mono, resolution = .25, cluster.name = "unintegrated_cluste
 mono <- RunUMAP(mono, dims = 1:10, verbose = FALSE)
 print(DimPlot(mono, reduction = "umap"))
 
+print(DimPlot(mono[,mono$groups == "s9_rosa26GA_p15"], reduction = "umap"))
 ```
-
 
 ```{R}
 dir = dirs[1]
@@ -159,46 +881,3 @@ plot(mono_umap$layout[,1],mono_umap$layout[,2], col = mono.clust$membership)
 legend('bottomright', legend = levels(as.factor(mono.clust$membership)), col = levels(as.factor(mono.clust$membership)), pch = 1)
 ```
 
-```{R}
-#markers = FindAllMarkers(object = mono)
-#write.csv(markers, '../data/processed/markers.csv')
-
-markers = read.csv('../data/processed/markers.csv')
-char_genes = read.csv('../data/processed/KollaCellClusterGenes.csv')
-hits_mat = NULL
-for(clust in 0:17){
-  hits = c()
-  for(cell_type in levels(as.factor(char_genes[,2]))){
-    clust_mark = markers[markers[,'cluster'] == clust,'gene'][1:150]
-    ct_filt = char_genes[,2] == cell_type
-    ct_mark = char_genes[ct_filt,1][1:150]
-    hits = c(hits,length(intersect(toupper(clust_mark), toupper(ct_mark))))
-  }
-  if(is.null(hits_mat)){
-    hits_mat = as.matrix(hits)
-  }
-  else{
-    hits_mat = cbind(hits_mat, hits)
-  }
-}
-rownames(hits_mat) = levels(as.factor(char_genes[,2]))
-colnames(hits_mat) = 0:17
-
-hits_mat
-norm_mat
-```
-
-```{R}
-    diff = setdiff(rownames(count), rownames(counts))
-    if(! is.null(diff)){
-      to_add = matrix(0, length(diff), dim(counts)[2])
-      rownames(to_add) = diff
-      counts = rbind(counts, to_add)
-    }
-    diff = setdiff(rownames(counts), rownames(count))
-    if(! is.null(diff)){
-      to_add = matrix(0, length(diff), dim(count)[2])
-      rownames(to_add) = diff
-      count = rbind(count, to_add)
-    }
-```
