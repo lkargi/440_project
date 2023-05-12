@@ -1,7 +1,13 @@
 library(slingshot)
+library(Seurat)
+library(SeuratDisk)
+library(SeuratData)
 
+coch.p8 =  LoadH5Seurat("data/processed/cochlear_p8.h5Seurat")
+coch.p15 = LoadH5Seurat("data/processed/cochlear_p15.h5Seurat")
 
 ## P8
+ct_labels = coch.p8[["Annotation"]]
 pal <- c(RColorBrewer::brewer.pal(9, "Set1"), RColorBrewer::brewer.pal(8, "Set2"))
 
 umap = Embeddings(coch.p8[["umap"]])
@@ -38,6 +44,7 @@ for(start in c("Deiters/Pillar/Phalangeal Cells", "Glia Cells", "Interdental Cel
 
 
 ## P15
+ct_labels = coch.p15[["Annotation"]]
 pal <- c(RColorBrewer::brewer.pal(9, "Set1"), RColorBrewer::brewer.pal(8, "Set2"))
 
 umap = Embeddings(coch.p15[["umap"]])

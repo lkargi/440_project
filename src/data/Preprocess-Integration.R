@@ -14,7 +14,7 @@ coch.p8.list = list()
 coch.p15.list = list()
 
 #Loading Data
-for(dir in list.dirs("../data/raw", recursive = FALSE)){
+for(dir in list.dirs("data/raw", recursive = FALSE)){
   print(dir)
   p8 = grepl("p8", dir)
   
@@ -103,3 +103,5 @@ coch.p15 <- FindClusters(coch.p15, resolution = .25, cluster.name = "unintegrate
 coch.p15 <- RunUMAP(coch.p15, dims = 1:50, verbose = FALSE)
 
 #SAVE DATA HERE
+SaveH5Seurat(coch.p8, "data/processed/cochlear_p8" ,overwrite = TRUE)
+SaveH5Seurat(coch.p15, "data/processed/cochlear_p15" ,overwrite = TRUE)
