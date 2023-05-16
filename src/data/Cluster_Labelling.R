@@ -1,6 +1,5 @@
 library(Seurat)
 library(SeuratDisk)
-library(SeuratData)
 
 coch.p8 =  LoadH5Seurat("data/processed/cochlear_p8.h5Seurat")
 coch.p15 = LoadH5Seurat("data/processed/cochlear_p15.h5Seurat")

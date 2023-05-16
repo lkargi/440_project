@@ -1,7 +1,6 @@
 library(Seurat)
 library(RColorBrewer)
 library(SeuratDisk)
-library(SeuratData)
 library(Matrix)
 library(class)
 library(cccd)
