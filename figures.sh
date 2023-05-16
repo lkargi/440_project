@@ -10,14 +10,15 @@ if [ ! -d "data/raw/" ]; then
     mkdir data/raw/
 fi
 
-if [ $ARG1 == "UMAP" ]; then
-    curl -o data/raw/dl.tar.gz "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM5520356&format=file&file=GSM5520356%5Fs9%5Frosa26WT%5Fp8%2Etar%2Egz"
-    tar -xf data/raw/dl.tar.gz -C data/raw/
-    gunzip data/raw/*/*.gz
+if [ ! -d "data/processed/" ]; then
+    mkdir data/processed/
+fi
 
-    rm data/raw/dl.tar.gz
+if [ ! -d "fig/" ]; then
+    mkdir fig/
+fi
 
-elif [ $ARG1 == "Data" ]; then
+if [ $ARG1 == "Data" ]; then
     curl -o data/raw/dl.tar.gz "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSM5520356&format=file&file=GSM5520356%5Fs9%5Frosa26WT%5Fp8%2Etar%2Egz"
     tar -xf data/raw/dl.tar.gz -C data/raw/
     gunzip data/raw/*.gz
@@ -57,10 +58,13 @@ elif [ $ARG1 == "Data" ]; then
 
     rm data/raw/dl.tar.gz
 
-else
-    echo "test"
+    Rscript src/data/Preprocess-Integration.R
+    Rscript src/data/Cluster_Labelling.R
+    Rscript src/data/Cluster_Annotation.R
 fi
 
+Rscript src/vis/UMAP.R
+Rscript src/analysis/Gene_Pseudotime.R
+Rscript src/analysis/Trajectory_Inference.R
 
 
-python src/vis/UMAP.py

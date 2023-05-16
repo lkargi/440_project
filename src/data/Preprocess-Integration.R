@@ -53,7 +53,6 @@ for(dir in list.dirs("data/raw", recursive = FALSE)){
   
   mt = PercentageFeatureSet(coch, pattern = "^MT-")
   coch[["percent.mt"]] = mt
-  print(VlnPlot(coch, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3))
   
   c = GetAssayData(object = coch, slot = "counts")
   
