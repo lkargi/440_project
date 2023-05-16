@@ -11,6 +11,7 @@ mkdir('fig/FigureS4')
 
 # P8
 ## Fig 3
+pdf(NULL)
 DimPlot(coch.p8, reduction = 'umap',group.by = "Annotation", cols = c("red", "green", "blue", "purple", 
                                                                            "cyan", "orange","gray"))
 ggsave(
@@ -19,8 +20,10 @@ ggsave(
  height = 5,
  dpi = 1200
 )
+dev.off()
 
 ## Fig S4
+pdf(NULL)
 FeaturePlot(coch.p8, features = "SLC1A3") + ggtitle("GLAST")
 ggsave(
   "fig/FigureS4/GLAST_p8.png",
@@ -28,10 +31,12 @@ ggsave(
   height = 4,
   dpi = 1200
 )
+dev.off()
 
 
 # P15
 ## Fig 3
+pdf(NULL)
 DimPlot(coch.p15, reduction = 'umap',group.by = "Annotation", cols = c("red", "green", "blue", "purple", 
                                                                             "cyan", "orange","gray"))
 ggsave(
@@ -40,8 +45,10 @@ ggsave(
   height = 5,
   dpi = 1200
 )
+dev.off()
 
 ## Fig S4
+pdf(NULL)
 FeaturePlot(coch.p15, features = "SLC1A3") + ggtitle("GLAST")
 ggsave(
   "fig/FigureS4/GLAST_p15.png",
@@ -49,3 +56,5 @@ ggsave(
   height = 4,
   dpi = 1200
 )
+dev.off()
+

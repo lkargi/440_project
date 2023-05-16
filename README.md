@@ -34,7 +34,7 @@ Raw data is available at: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE
 - **data/** : 	directory containing data used in analysis
     - **raw/** : raw counts data (not included in repo due to space constraints)
     - **processed/** : Cell Cluster marker genes (Kolla et al.), and processed data generated in src/data/ (mostly excluded due to space constraints)
-- **fig/** : 	directory containing outputs from src/vis and src/analysis
+- **fig/** : 	directory containing outputs from src/vis and src/analysis (excluded due to space constraints)
 - **notebook/** : 	directory containing notebooks used in initial data exploration 
 
 # INSTALLATION

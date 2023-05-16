@@ -1,10 +1,12 @@
 __pycache__/
 *.py[cod]
-data/
+data/raw/
 .ipynb_checkpoints/
 .DS_STORE
 !src/data/
 .RDataTmp
 .Rhistory
 *.docx
+data/processed/
 !data/processed/KollaCellClusterGenes.csv
+fig/
