@@ -4,3 +4,6 @@ data/
 .ipynb_checkpoints/
 .DS_STORE
 !src/data/
+.RDataTmp
+.Rhistory
+*.docx
