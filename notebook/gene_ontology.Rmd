@@ -1,0 +1,156 @@
+---
+title: "gene_ontology"
+output: html_document
+date: "2023-05-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{R}
+#install.packages("SeuratDisk")
+library(Seurat)
+#library(SeuratDisk)
+#library(SeuratData)
+library(Matrix)
+library(class)
+```
+
+```{R}
+if (!requireNamespace("remotes", quietly = TRUE)) {
+  install.packages("remotes")
+}
+remotes::install_github("mojaveazure/seurat-disk")
+```
+
+```{R}
+library(SeuratDisk)
+```
+
+```{R}
+p8 <- LoadH5Seurat('../data/processed/Archive/cochlear_p8.h5seurat')
+```
+```{R}
+# UMAP of cells in each cluster by sample
+DimPlot(p8, 
+        label = TRUE)  + NoLegend()
+```
+
+```{R}
+# Rename all identities
+p8 <- RenameIdents(object = p8, 
+                               "0" = "Deiters",
+                               "1" = "Deiters",
+                               "2" = "Deiters",
+                               "3" = "Deiters",
+                               "4" = "Interdental",
+                               "5" = "LGER",
+                               "6" = "Hair Cell",
+                               "7" = "IPhC",
+                               "8" = "Oc90+",
+                               "9" = "Interdental",
+                               "10" = "Oc90+",
+                               "11" = "IPhC",
+                               "12" = "OS",
+                               "13" = "Undefined",
+                               "14" = "Hair Cell",
+                               "15" = "LGER",
+                              "16" = "LGER",
+                   "17" = "Glia",
+                   "18" = "OS",
+                   "19" = "Glia",
+                   "20" = "Undefined",
+                   "21" = "Undefined",
+                   "22" = "IPhC",
+                   "23" = "Undefined")
+
+# Plot the UMAP
+DimPlot(object = p8, 
+        reduction = "umap", 
+        label = TRUE,
+        label.size = 3,
+        repel = TRUE)
+```
+
+```{R}
+DE_p8_Deiters <- FindMarkers(p8, ident.1 = "s9_rosa26WT_p8", group.by = 'groups', subset.ident = "Deiters")
+write.csv(DE_p8_Deiters, '../data/processed/DE_new/DE_p8_Deiters.csv', row.names=TRUE)
+```
+
+```{R}
+DE_p8_Glia <- FindMarkers(p8, ident.1 = "s9_rosa26WT_p8", group.by = 'groups', subset.ident = "Glia")
+write.csv(DE_p8_Glia, '../data/processed/DE_new/DE_p8_Glia.csv', row.names=TRUE)
+```
+
+```{R}
+DE_p8_OC90 <- FindMarkers(p8, ident.1 = "s9_rosa26WT_p8", group.by = 'groups', subset.ident = "Oc90+")
+write.csv(DE_p8_OC90, '../data/processed/DE_new/DE_p8_OC90.csv', row.names=TRUE)
+```
+
+```{R}
+DE_p8_Interdental <- FindMarkers(p8, ident.1 = "s9_rosa26WT_p8", group.by = 'groups', subset.ident = "Interdental")
+write.csv(DE_p8_Interdental, '../data/processed/DE_new/DE_p8_Interdental.csv', row.names=TRUE)
+```
+
+```{R}
+DE_p8_LGER <- FindMarkers(p8, ident.1 = "s9_rosa26WT_p8", group.by = 'groups', subset.ident = "LGER")
+write.csv(DE_p8_LGER, '../data/processed/DE_new/DE_p8_LGER.csv', row.names=TRUE)
+```
+
+```{R}
+p15 <- LoadH5Seurat('../data/processed/Archive/cochlear_p15.h5seurat')
+```
+
+```{R}
+# UMAP of cells in each cluster by sample
+DimPlot(p15, 
+        label = TRUE)  + NoLegend()
+```
+
+```{R}
+# Rename all identities
+p15 <- RenameIdents(object = p15, 
+                               "0" = "Interdental",
+                               "1" = "Undefined",
+                               "2" = "Deiters",
+                               "3" = "Undefined",
+                               "4" = "Deiters",
+                               "5" = "LGER",
+                               "6" = "Glia",
+                               "7" = "Deiters",
+                               "8" = "LGER",
+                               "9" = "Undefined",
+                               "10" = "Undefined",
+                               "11" = "Hair cells",
+                               "12" = "Undefined",
+                               "13" = "Undefined",
+                               "14" = "Oc90+",
+                               "15" = "Undefined",
+                              "16" = "Undefined",
+                   "17" = "LGER",
+                   "18" = "Undefined",
+                   "19" = "Undefined",
+                   "20" = "Undefined",
+                   "21" = "Undefined")
+
+# Plot the UMAP
+DimPlot(object = p15, 
+        reduction = "umap", 
+        label = TRUE,
+        label.size = 3,
+        repel = TRUE)
+```
+
+```{R}
+DE_p15_Deiters <- FindMarkers(p15, ident.1 = "s9_rosa26WT_p15", group.by = 'groups', subset.ident = "Deiters")
+write.csv(DE_p15_Deiters, '../data/processed/DE_new/DE_p15_Deiters.csv', row.names=TRUE)
+DE_p15_Glia <- FindMarkers(p15, ident.1 = "s9_rosa26WT_p15", group.by = 'groups', subset.ident = "Glia")
+write.csv(DE_p15_Glia, '../data/processed/DE_new/DE_p15_Glia.csv', row.names=TRUE)
+DE_p15_OC90 <- FindMarkers(p15, ident.1 = "s9_rosa26WT_p15", group.by = 'groups', subset.ident = "Oc90+")
+write.csv(DE_p15_OC90, '../data/processed/DE_new/DE_p15_OC90.csv', row.names=TRUE)
+DE_p15_Interdental <- FindMarkers(p15, ident.1 = "s9_rosa26WT_p15", group.by = 'groups', subset.ident = "Interdental")
+write.csv(DE_p15_Interdental, '../data/processed/DE_new/DE_p15_Interdental.csv', row.names=TRUE)
+DE_p15_LGER <- FindMarkers(p15, ident.1 = "s9_rosa26WT_p15", group.by = 'groups', subset.ident = "LGER")
+write.csv(DE_p15_LGER, '../data/processed/DE_new/DE_p15_LGER.csv', row.names=TRUE)
+```
