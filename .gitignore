@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 data/
+!data/processed/
 .ipynb_checkpoints/
 .DS_STORE
 !src/data/
