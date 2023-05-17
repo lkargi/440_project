@@ -1,14 +1,16 @@
 library(Seurat)
 library(SeuratDisk)
+library(icesTAF)
 
 coch.p8 =  LoadH5Seurat("data/processed/cochlear_p8.h5Seurat")
 coch.p15 = LoadH5Seurat("data/processed/cochlear_p15.h5Seurat")
 
+mkdir('data/processed/Celltype_Annotation/')
 
 markers.p8 = FindAllMarkers(object = coch.p8)
 markers.p15 = FindAllMarkers(object = coch.p15)
-write.csv(markers.p8, 'data/processed/markers_p8.csv')
-write.csv(markers.p15, 'data/processed/markers_p15.csv')
+write.csv(markers.p8, 'data/processed/Celltype_Annotation/markers_p8.csv')
+write.csv(markers.p15, 'data/processed/Celltype_Annotation/markers_p15.csv')
 
 
 #Label Clusters
@@ -106,7 +108,7 @@ colnames(hits_num.p15) = 0:num_clust
 
 
 #SAVE HITS
-write.csv(hits_med.p8, 'data/processed/hits_med_p8.csv')
-write.csv(hits_med.p15, 'data/processed/hits_med_p15.csv')
-write.csv(hits_num.p8, 'data/processed/hits_num_p8.csv')
-write.csv(hits_num.p15, 'data/processed/hits_num_p15.csv')
+write.csv(hits_med.p8, 'data/processed/Celltype_Annotation/hits_med_p8.csv')
+write.csv(hits_med.p15, 'data/processed/Celltype_Annotation/hits_med_p15.csv')
+write.csv(hits_num.p8, 'data/processed/Celltype_Annotation/hits_num_p8.csv')
+write.csv(hits_num.p15, 'data/processed/Celltype_Annotation/hits_num_p15.csv')
