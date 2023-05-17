@@ -64,6 +64,7 @@ if [ $ARG1 == "Data" ]; then
 fi
 
 Rscript src/vis/UMAP.R
+Rscript src/analysis/GeneOntology.R
 Rscript src/analysis/Gene_Pseudotime.R
 Rscript src/analysis/Trajectory_Inference.R
 

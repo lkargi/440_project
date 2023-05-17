@@ -55,6 +55,9 @@ OR
     - then run "src/data/Preprocess-Integration.R", "src/data/Cluster_Labelling.R" and "src/data/Cluster_Annotation.R" to generate processed data
     - finally generate figures with "sh figures.sh"
 
+NOTE: aside from figures
+-  all files associated with cluster annotation are generated in data/processed/Celltype_Annotation/
+-  inputs to Gene Ontology are generated in data/processed/Ontology_Input/
 
 # CITATIONS
 
